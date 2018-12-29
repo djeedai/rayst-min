@@ -1,8 +1,8 @@
 use std::{self,io,io::Write};use rand::{Rng,FromEntropy};use rand::rngs::SmallRng
 ;type F=f32;
 #[derive(Debug, Copy, Clone)]
-struct V(F,F,F);impl V{fn d(&self, o: &V)->F{self.0*o.0+self.1*o.1+self.2*o.2}fn
-n(&self)->V{self*self.d(self).sqrt().recip()}}fn v1(f:F)->V{V(f,f,f)}
+struct V(F,F,F);impl V{fn d(&self,o:V)->F{self.0*o.0+self.1*o.1+self.2*o.2}fn n(
+&self)->V{self*self.d(*self).sqrt().recip()}}fn v1(f:F)->V{V(f,f,f)}
 
 macro_rules! bin_op {
     ( $trait:ident, $name:ident, $op:tt, $lhs:ty, $rhs:ty ) => {
@@ -64,7 +64,7 @@ impl std::ops::AddAssign<&V> for V {
 
 fn bt(p:&V,l:&V,h:&V)->F{let l=p-l;let h=h-p;-l.0.min(h.0).min(l.1.min(h.1)).min(l.2.min(h.2))}
 
-fn s(pos: &V)->(F, i32) {
+fn s(pos:V)->(F,i32){
     let mut hit = 1; // unless overridden by walls/sun below
     let mut dist : F = 1e9;
 
@@ -77,9 +77,9 @@ fn s(pos: &V)->(F, i32) {
             let begin = V(data[i*4] as F - 79.0,  data[i*4+1] as F - 79.0,  0.0) * 0.5;
             let end = V(data[i*4+2] as F - 79.0,  data[i*4+3] as F - 79.0,  0.0) * 0.5;
             let delta = &end - &begin;
-            let d = (&begin - &origin).d(&delta) / delta.d(&delta);
+            let d = (&begin - &origin).d(delta) / delta.d(delta);
             let v = &origin - &(&begin + &delta * (-d.min(0.0)).min(1.0));
-            dist = dist.min(v.d(&v));
+            dist = dist.min(v.d(v));
         }
         dist = dist.sqrt();
 
@@ -92,11 +92,11 @@ fn s(pos: &V)->(F, i32) {
             let mut o = &origin - c;
             let curve_dist : F;
             if o.0 > 0.0 {
-                curve_dist = o.d(&o).sqrt() - 2.;
+                curve_dist = o.d(o).sqrt() - 2.;
             }
             else {
                 o.1+=if o.1>0.{-2.}else{0.};
-                curve_dist = o.d(&o).sqrt(); 
+                curve_dist = o.d(o).sqrt(); 
             }
             dist = dist.min(curve_dist);
         }
@@ -141,21 +141,21 @@ struct Hit {
     norm : V
 }
 
-fn ray_march(pos: &V, dir: &V, hit: &mut Hit)->i32 {
+fn ray_march(p:&V,v:&V, hit: &mut Hit)->i32{
     let mut c=0;
     let mut t:F=0.;
     while t<100.{
-        hit.pos = pos + dir * t;
-        let (dist, hit_type) = s(&hit.pos);
-        c += 1;
-        if (dist < 0.01) || (c > 99) {
-            let nx = s(&(&hit.pos + V(0.01,0.,0.))).0 - dist;
-            let ny = s(&(&hit.pos + V(0.,0.01,0.))).0 - dist;
-            let nz = s(&(&hit.pos + V(0.,0.,0.01))).0 - dist;
+        hit.pos=p+v*t;
+        let (d,h) = s(hit.pos);
+        c+=1;
+        if (d<0.01) || (c > 99) {
+            let nx = s(hit.pos+V(0.01,0.,0.)).0-d;
+            let ny = s(hit.pos+V(0.,0.01,0.)).0-d;
+            let nz = s(hit.pos+V(0.,0.,0.01)).0-d;
             hit.norm = V(nx,  ny,  nz).n();
-            return hit_type;
+            return h;
         }
-        t += dist;
+        t += d;
     }
     return 0;
 }
@@ -167,15 +167,15 @@ fn trace<R: Rng + ?Sized>(pos: &V, dir: &V, rng: &mut R)->V {
     let mut c = v1(0.0);
     let mut a = v1(1.0);
     let light_dir = V(0.6,  0.6,  1.0).n();
-    for _bounce in 0..3 {
+    for _ in 0..3{
         match ray_march(&origin, &direction, &mut hit) {
             1 => {
-                direction += &hit.norm * (-2.0 * hit.norm.d(&direction));
-                origin = &hit.pos + &direction * 0.1;
+                direction += hit.norm * (-2.0 * hit.norm.d(direction));
+                origin = hit.pos + direction * 0.1;
                 a = &a * 0.2;
             },
             2 => {
-                let incidence = hit.norm.d(&light_dir);
+                let incidence = hit.norm.d(light_dir);
                 let p = 6.283185 * rng.gen::<F>();
                 let q = rng.gen::<F>();
                 let s = (1.0 - q).sqrt();
