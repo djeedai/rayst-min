@@ -136,70 +136,64 @@ fn s(pos:V)->(F,i32){
     return (dist, hit);
 }
 
-struct Hit {
-    pos : V,
-    norm : V
-}
-
-fn ray_march(p:&V,v:&V, hit: &mut Hit)->i32{
+fn ray_march(o:&V,v:&V)->(i32,V,V){
     let mut c=0;
     let mut t:F=0.;
     while t<100.{
-        hit.pos=p+v*t;
-        let (d,h) = s(hit.pos);
+        let p=o+v*t;
+        let (d,h) = s(p);
         c+=1;
         if (d<0.01) || (c > 99) {
-            let nx = s(hit.pos+V(0.01,0.,0.)).0-d;
-            let ny = s(hit.pos+V(0.,0.01,0.)).0-d;
-            let nz = s(hit.pos+V(0.,0.,0.01)).0-d;
-            hit.norm = V(nx,  ny,  nz).n();
-            return h;
+            let nx = s(p+V(0.01,0.,0.)).0-d;
+            let ny = s(p+V(0.,0.01,0.)).0-d;
+            let nz = s(p+V(0.,0.,0.01)).0-d;
+            return (h,p,V(nx,ny,nz).n());
         }
-        t += d;
+        t+=d;
     }
-    return 0;
+    return (0,v1(0.),v1(0.));
 }
 
 fn trace<R: Rng + ?Sized>(pos: &V, dir: &V, rng: &mut R)->V {
     let mut origin = *pos;
     let mut direction = *dir;
-    let mut hit = Hit{ pos: origin, norm: origin }; // useless init
     let mut c = v1(0.0);
     let mut a = v1(1.0);
     let light_dir = V(0.6,  0.6,  1.0).n();
     for _ in 0..3{
-        match ray_march(&origin, &direction, &mut hit) {
+        let (t,p,n)=ray_march(&origin, &direction);
+        match t {
             1 => {
-                direction += hit.norm * (-2.0 * hit.norm.d(direction));
-                origin = hit.pos + direction * 0.1;
+                direction += n * (-2.0 * n.d(direction));
+                origin = p + direction * 0.1;
                 a = &a * 0.2;
             },
             2 => {
-                let incidence = hit.norm.d(light_dir);
-                let p = 6.283185 * rng.gen::<F>();
+                let incidence = n.d(light_dir);
+                let r = 6.283185 * rng.gen::<F>();
                 let q = rng.gen::<F>();
                 let s = (1.0 - q).sqrt();
-                let g = if hit.norm.2 < 0.0 { -1.0 } else { 1.0 };
-                let u = -1.0 / (g + hit.norm.2);
-                let v = hit.norm.0 * hit.norm.1 * u;
+                let g = if n.2 < 0.0 { -1.0 } else { 1.0 };
+                let u = -1.0 / (g + n.2);
+                let v = n.0 * n.1 * u;
                 direction = V(
                      v,
-                     g + hit.norm.1 * hit.norm.1 * u,
-                     -hit.norm.1
-                 ) * (p.cos() * s)
+                     g + n.1 * n.1 * u,
+                     -n.1
+                 ) * (r.cos() * s)
                 +
                 V(
-                     1.0 + g * hit.norm.0 * hit.norm.0 * u,
+                     1.0 + g * n.0 * n.0 * u,
                      g * v,
-                     -g * hit.norm.0
-                 ) * (p.sin() * s)
+                     -g * n.0
+                 ) * (r.sin() * s)
                 +
-                hit.norm * q.sqrt();
-                origin = &hit.pos + &direction * 0.1;
+                n * q.sqrt();
+                origin = p+direction*0.1;
                 a = &a * 0.2;
                 if incidence > 0.0 {
-                    if let 3 = ray_march(&(&origin + &(&hit.norm * 0.1)), &light_dir, &mut hit) {
-                        c += &a * &V(500.0,  400.0,  100.0) * incidence;
+                    if let 3 = ray_march(&(&origin + &(&n * 0.1)), &light_dir).0 {
+                        c+=a*V(5e2,4e2,1e2)*incidence;
                     }
                 }
             },
