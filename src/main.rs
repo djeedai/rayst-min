@@ -2,7 +2,8 @@ use std::{self,io,io::Write};use rand::{Rng,FromEntropy};use rand::rngs::SmallRn
 ;type F=f32;
 #[derive(Debug, Copy, Clone)]
 struct V(F,F,F);impl V{fn d(&self,o:V)->F{self.0*o.0+self.1*o.1+self.2*o.2}fn n(
-&self)->V{self*self.d(*self).sqrt().recip()}}fn v1(f:F)->V{V(f,f,f)}
+&self)->V{self*self.d(*self).sqrt().recip()}}fn v1(f:F)->V{V(f,f,f)}fn v2(x:F,y:
+F)->V{V(x,y,0.)}
 
 macro_rules! bin_op {
     ( $trait:ident, $name:ident, $op:tt, $lhs:ty, $rhs:ty ) => {
@@ -71,14 +72,14 @@ fn s(pos:V)->(F,i32){
     // Letters
     {
         // Distance to letter segments in X-Y plane
-        let origin = V(pos.0,pos.1,0.0);
+        let o = V(pos.0,pos.1,0.0);
         let data : &'static[u8; 15*4] = b"5O5_5W9W5_9_AOEOCOC_A_E_IOQ_I_QOUOY_Y_]OWW[WaOa_aWeWa_e_cWiO";
         for i in 0..15 {
             let begin = V(data[i*4] as F - 79.0,  data[i*4+1] as F - 79.0,  0.0) * 0.5;
             let end = V(data[i*4+2] as F - 79.0,  data[i*4+3] as F - 79.0,  0.0) * 0.5;
             let delta = &end - &begin;
-            let d = (&begin - &origin).d(delta) / delta.d(delta);
-            let v = &origin - &(&begin + &delta * (-d.min(0.0)).min(1.0));
+            let d = (&begin - &o).d(delta) / delta.d(delta);
+            let v = &o - &(&begin + &delta * (-d.min(0.0)).min(1.0));
             dist = dist.min(v.d(v));
         }
         dist = dist.sqrt();
@@ -89,7 +90,7 @@ fn s(pos:V)->(F,i32){
             V(11.,6.,0.),
         ];
         for c in &curves {
-            let mut o = &origin - c;
+            let mut o = &o - c;
             let curve_dist : F;
             if o.0 > 0.0 {
                 curve_dist = o.d(o).sqrt() - 2.;
@@ -136,7 +137,7 @@ fn s(pos:V)->(F,i32){
     return (dist, hit);
 }
 
-fn ray_march(o:&V,v:&V)->(i32,V,V){
+fn ray_march(o:V,v:V)->(i32,V,V){
     let mut c=0;
     let mut t:F=0.;
     while t<100.{
@@ -144,8 +145,8 @@ fn ray_march(o:&V,v:&V)->(i32,V,V){
         let (d,h) = s(p);
         c+=1;
         if (d<0.01) || (c > 99) {
-            let nx = s(p+V(0.01,0.,0.)).0-d;
-            let ny = s(p+V(0.,0.01,0.)).0-d;
+            let nx = s(p+v2(0.01,0.)).0-d;
+            let ny = s(p+v2(0.,0.01)).0-d;
             let nz = s(p+V(0.,0.,0.01)).0-d;
             return (h,p,V(nx,ny,nz).n());
         }
@@ -154,58 +155,14 @@ fn ray_march(o:&V,v:&V)->(i32,V,V){
     return (0,v1(0.),v1(0.));
 }
 
-fn trace<R: Rng + ?Sized>(pos: &V, dir: &V, rng: &mut R)->V {
-    let mut origin = *pos;
-    let mut direction = *dir;
-    let mut c = v1(0.0);
-    let mut a = v1(1.0);
-    let light_dir = V(0.6,  0.6,  1.0).n();
-    for _ in 0..3{
-        let (t,p,n)=ray_march(&origin, &direction);
-        match t {
-            1 => {
-                direction += n * (-2.0 * n.d(direction));
-                origin = p + direction * 0.1;
-                a = &a * 0.2;
-            },
-            2 => {
-                let incidence = n.d(light_dir);
-                let r = 6.283185 * rng.gen::<F>();
-                let q = rng.gen::<F>();
-                let s = (1.0 - q).sqrt();
-                let g = if n.2 < 0.0 { -1.0 } else { 1.0 };
-                let u = -1.0 / (g + n.2);
-                let v = n.0 * n.1 * u;
-                direction = V(
-                     v,
-                     g + n.1 * n.1 * u,
-                     -n.1
-                 ) * (r.cos() * s)
-                +
-                V(
-                     1.0 + g * n.0 * n.0 * u,
-                     g * v,
-                     -g * n.0
-                 ) * (r.sin() * s)
-                +
-                n * q.sqrt();
-                origin = p+direction*0.1;
-                a = &a * 0.2;
-                if incidence > 0.0 {
-                    if let 3 = ray_march(&(&origin + &(&n * 0.1)), &light_dir).0 {
-                        c+=a*V(5e2,4e2,1e2)*incidence;
-                    }
-                }
-            },
-            3 => {
-                c += &a * &V(50.0,  80.0,  100.0);
-                break;
-            },
-            _ => break
-        }
-    }
-    return c;
-}
+fn trace<R:Rng+?Sized>(e:V,f:V,w:&mut R)->V{
+let mut o=e;let mut d=f;let mut c=v1(0.);let mut a=v1(1.);let l=V(0.6,0.6,1.).n();
+for _ in 0..3{let (t,p,n)=ray_march(o,d);match t{1=>{d+=n*-2.*n.d(d);o=p+d*0.1;a=a*0.2;},
+2=>{let i=n.d(l);let r=6.283185*w.gen::<F>();
+let q:F=w.gen();let s=(1.-q).sqrt();let g=n.2.signum();let u=-1./(g+n.2);
+let v=n.0*n.1*u;d=V(v,g+n.1*n.1*u,-n.1)*r.cos()*s+V(1.+g*n.0*n.0*u,g*v,-g*n.0)*r.sin()*s+n*q.sqrt();
+o=p+d*0.1;a=a*0.2;if i>0.{if let 3=ray_march(o+n*0.1,l).0{c+=a*V(5e2,4e2,1e2)*i;}
+}},3=>{c+=a*V(5e1,8e1,1e2);break;},_=>break}}return c;}
 
 fn main(){
     let width : i32 = 192; //960;
@@ -236,7 +193,7 @@ fn main(){
                 let fx : F = rng.gen();
                 let fy : F = rng.gen();
                 let dir = (goal + left * (fx0 + fx) + up * (fy0 + fy)).n();
-                c += trace(&position, &dir, &mut rng);
+                c += trace(position, dir, &mut rng);
             }
             c = c * sample_norm + sample_bias;
             let den = &c + 1.0;
