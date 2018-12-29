@@ -63,9 +63,9 @@ impl std::ops::AddAssign<&V> for V {
     }
 }
 
-fn bt(p:&V,l:&V,h:&V)->F{let l=p-l;let h=h-p;-l.0.min(h.0).min(l.1.min(h.1)).min(l.2.min(h.2))}
+fn bt(p:V,l:V,h:V)->F{let l=p-l;let h=h-p;-l.0.min(h.0).min(l.1.min(h.1)).min(l.2.min(h.2))}
 
-fn s(p:V)->(F,i32){let mut hit=1;let mut d:F=1e9;let o=v2(p.0,p.1);
+fn s(p:V)->(F,i32){let mut h=1;let mut d:F=1e9;let o=v2(p.0,p.1);
 let l=b"5O5_5W9W5_9_AOEOCOC_A_E_IOQ_I_QOUOY_Y_]OWW[WaOa_aWeWa_e_cWiO";
 for i in 0..15{
 let b=v2(l[i*4]as F-79.,l[i*4+1]as F-79.)*0.5;
@@ -74,31 +74,10 @@ let v=o-(b+e*(-((b-o).d(e)/e.d(e)).min(0.)).min(1.));
 d=d.min(v.d(v));}d=d.sqrt();
 for c in&[v2(-11.,6.),v2(11.,6.)]{let mut o=o-c;
 let g:F;if o.0>0.{g=o.d(o).sqrt()-2.;}else{o.1+=-o.1.signum()-1.;g=o.d(o).sqrt();}d=d.min(g);}
-        
-        d = (d.powf(8.0) + p.2.powf(8.0)).powf(0.125) - 0.5;
-        let carved_box_room_dist = bt(&p, &V(-30.0, -0.5, -30.0), &V(30.0, 18.0, 30.0));
-        let carved_ceiling_dist = bt(&p, &V(-25.0, 17.0, -25.0), &V(25.0, 20.0, 25.0));
-        let ceiling_beams_dist = bt(
-                &V(
-                     (p.0.abs() / 8.0).fract() * 8.0, // |x| % 8
-                    p.1,p.2
-                ),
-                &V(1.5, 18.5, -25.0),
-                &V(6.5, 20.0, 25.0)
-            );
-        let room_dist = (-carved_box_room_dist.min(carved_ceiling_dist)).min(ceiling_beams_dist);
-        if room_dist < d {
-            d = room_dist;
-            hit = 2;
-        }
-        let sun_dist = 19.9 - p.1;
-        if sun_dist < d {
-            d = sun_dist;
-            hit = 3;
-        }
-
-    return (d, hit);
-}
+d=(d.powf(8.)+p.2.powf(8.)).powf(0.125)-0.5;
+let r=(-bt(p,V(-30.,-0.5,-30.),V(30.,18.,30.)).min(
+bt(p,V(-25.,17.,-25.),V(25.,20.,25.)))).min(bt(V((p.0.abs()/8.).fract()*8.,p.1,p.2),V(1.5,18.5,-25.),V(6.5,20.,25.)));
+if r<d{d=r;h=2;}let s=19.9-p.1;if s<d{d=s;h=3;}return(d,h);}
 
 fn ray_march(o:V,v:V)->(i32,V,V){let mut c=0;let mut t:F=0.;while t<1e2{let p=o+v*t;
 let(d,h)=s(p);c+=1;if(d<0.01)||(c>99){return(h,p,V(s(p+v2(0.01,0.)).0-d,
