@@ -83,7 +83,7 @@ fn ray_march(o:V,v:V)->(i32,V,V){let mut c=0;let mut t:F=0.;while t<1e2{let p=o+
 let(d,h)=s(p);c+=1;if(d<0.01)||(c>99){return(h,p,V(s(p+v2(0.01,0.)).0-d,
 s(p+v2(0.,0.01)).0-d,s(p+V(0.,0.,0.01)).0-d).n());}t+=d;}return(0,v1(0.),v1(0.));}
 
-fn trace<R:Rng+?Sized>(e:V,f:V,w:&mut R)->V{
+fn t<R:Rng+?Sized>(e:V,f:V,w:&mut R)->V{
 let mut o=e;let mut d=f;let mut c=v1(0.);let mut a=v1(1.);let l=V(0.6,0.6,1.).n();
 for _ in 0..3{let (t,p,n)=ray_march(o,d);match t{1=>{d+=n*-2.*n.d(d);o=p+d*0.1;a=a*0.2;},
 2=>{let i=n.d(l);let r=6.283185*w.gen::<F>();
@@ -92,44 +92,28 @@ let v=n.0*n.1*u;d=V(v,g+n.1*n.1*u,-n.1)*r.cos()*s+V(1.+g*n.0*n.0*u,g*v,-g*n.0)*r
 o=p+d*0.1;a=a*0.2;if i>0.{if let 3=ray_march(o+n*0.1,l).0{c+=a*V(5e2,4e2,1e2)*i;}
 }},3=>{c+=a*V(5e1,8e1,1e2);break;},_=>break}}return c;}
 
-fn main(){let w:i32=192;let h:i32=108;
-    let s = 16;
-
-    let position = V(-22.0, 5.0, 25.0);
-    let goal = (&V(-3.0, 4.0, 0.0) - &position).n();
-    let left = V(goal.2, 0.0, -goal.0).n() * (1.0 / (w as F));
-    let up = V(
-         goal.1 * left.2 - goal.2 * left.1,
-         goal.2 * left.0 - goal.0 * left.2,
-         goal.0 * left.1 - goal.1 * left.0
-    );
-
-    let mut rng = SmallRng::from_entropy();
-
-    print!("P6 {} {} 255 ", w, h);
-    let sample_norm = 1.0 / (s as F);
-    let sample_bias = 14.0 / 241.0;
-    let mut arr : Vec<u8> = Vec::with_capacity((w * h * 3) as usize);
-    for y in (0..h).rev() {
-        let fy0 : F = (y - h / 2) as F;
-        for x in (0..w).rev() {
-            let mut c = V(0.0, 0.0, 0.0);
-            let fx0 : F = (x - w / 2) as F;
-            for _ in 0..s {
-                let fx : F = rng.gen();
-                let fy : F = rng.gen();
-                let dir = (goal + left * (fx0 + fx) + up * (fy0 + fy)).n();
-                c += trace(position, dir, &mut rng);
+fn main(){let w:i32=192;let h:i32=108;let s=16;
+    let p=V(-22.,5.,25.);let g=(v2(-3.,4.)-p).n();
+    let l=V(g.2,0.,-g.0).n()*(1./(w as F));
+    let u=V(g.1*l.2-g.2*l.1,g.2*l.0-g.0*l.2,g.0*l.1-g.1*l.0);
+    let mut r = SmallRng::from_entropy();
+    print!("P6 {} {} 255 ",w,h);
+    let mut a : Vec<u8> = Vec::with_capacity((w * h * 3) as usize);
+    for j in (0..h).rev() {
+        for i in (0..w).rev() {
+            let mut c=v1(0.);
+            for _ in 0..s{
+                c+=t(p,(g+l*((i-w/2)as F+r.gen::<F>())+u*((j-h/2)as F+r.gen::<F>())).n(),&mut r);
             }
-            c = c * sample_norm + sample_bias;
-            let den = &c + 1.0;
+            c=c*(1./(s as F))+14./241.;
+            let den=c+1.;
             c.0 *= 255.0 / den.0;
             c.1 *= 255.0 / den.1;
             c.2 *= 255.0 / den.2;
-            arr.push(c.0 as u8);
-            arr.push(c.1 as u8);
-            arr.push(c.2 as u8);
+            a.push(c.0 as u8);
+            a.push(c.1 as u8);
+            a.push(c.2 as u8);
         }
     }
-    io::stdout().write_all(&arr[..]).expect("");
+    io::stdout().write_all(&a[..]).expect("");
 }
